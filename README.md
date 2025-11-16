@@ -29,7 +29,8 @@ To use this project, you'll need to configure:
 Before creating the infrastructure, the project must be bootstrapped to prepare resources.
 
 1. Customize your Stack **by modifying variables in the [`.env`](./.env) file**
-- *ACCESS_NUM* - Number of access users. One cluster per user will be created
+- *ACCESS_NUM* - Number of access users. One editor access per user will be created. 1 by default
+- *CLUSTERS_NUM* - Number of clusters. Same as access users by default
 - *WORKERS_NUM* - Number of worker nodes per cluster. 1 by default
 - *K8S_VERSION* - The Kubernetes version. 1.33 by default
 - *ACCESS_PSW* - The password access users will use to connect to code-server

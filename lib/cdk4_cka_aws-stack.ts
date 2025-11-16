@@ -7,7 +7,8 @@ export class Cdk4CkaAwsStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
     
-    const USERS : number = Number(process.env.ACCESS_NUM) || 10
+    const USERS : number = Number(process.env.ACCESS_NUM) || 1
+    const CLUSTERS : number = Number(process.env.CLUSTERS_NUM) || USERS
     const WORKERS : number = Number(process.env.WORKERS_NUM) || 1
     const REGION: string = this.region
     const K8S_VERSION : string = process.env.K8S_VERSION || "1.33"
@@ -444,7 +445,7 @@ export class Cdk4CkaAwsStack extends Stack {
       `sudo reboot now`
     )
     
-    for (let x = 1; x <= USERS; x++) {
+    for (let x = 1; x <= CLUSTERS; x++) {
       let cpVm = new Instance(this, `K8sCP${x}`, {
         vpc: vpc,
         instanceName: `k8s-cp${x}`,
