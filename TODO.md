@@ -1,0 +1,1 @@
+- [ ] Add a the possibility to create ready to use clusters (for CKAD)
