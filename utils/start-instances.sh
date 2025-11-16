@@ -14,7 +14,7 @@ echo "Restart code-server"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../.env"
 
-bash $SCRIPT_DIR/get-ssh-key.ps1
+bash $SCRIPT_DIR/get-ssh-key.sh
 # Upload start-code-server to accss VM using scp
 PUBLIC_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=CKA-access-vm" "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].PublicIpAddress" --output text)
 scp -o "StrictHostKeyChecking no" -i key.pem ./utils/start-code-server.sh ec2-user@${PUBLIC_IP}:/public/start-code-server.sh

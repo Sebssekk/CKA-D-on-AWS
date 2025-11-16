@@ -15,7 +15,7 @@ for x in $(seq 1 $ACCESS_NUM); do
 done
 
 # Generate key.pem
-bash $SCRIPT_DIR/get-ssh-key.ps1
+bash $SCRIPT_DIR/get-ssh-key.sh
 # Upload user-instances.csv to accss VM using scp
 PUBLIC_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=CKA-access-vm" "Name=instance-state-name,Values=running" --query "Reservations[].Instances[].PublicIpAddress" --output text)
 scp -o "StrictHostKeyChecking no" -i key.pem user-instances.csv ec2-user@${PUBLIC_IP}:/public/user-instances.csv
