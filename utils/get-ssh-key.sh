@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 
 # Get the key id
 keyId=$(aws ec2 describe-key-pairs --filters Name=key-name,Values=CKA-access-keypair --query "KeyPairs[*].KeyPairId" --output text)
