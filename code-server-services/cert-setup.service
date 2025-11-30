@@ -1,0 +1,17 @@
+[Unit]
+Description=AWS EC2 Dynamic Certificate Setup for Code Server
+# Must run after network is online to reach the metadata service (169.254.169.254)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Execute the setup script
+ExecStart=/opt/setup-cert.sh
+
+# This service is a one-off task
+Type=oneshot
+# The service must finish successfully before other services depending on it can start
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

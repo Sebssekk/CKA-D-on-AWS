@@ -80,6 +80,7 @@ All nodes can be accessed with the same ssh key generated on startup.
         - `kubectl`
         - `kubeadm`
         - `cilium`
+        - `etcdctl`/`etcdutl`
 - ### **Access Node**
     *Access* node configuration:
     - user: 

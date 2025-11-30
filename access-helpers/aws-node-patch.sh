@@ -1,5 +1,5 @@
 #!/bin/bash
-sed -i 's*\r**' /public/*.csv
+
 for user_dir in  /home/user*; do
     export KUBECONFIG=$user_dir/.kube/config
     nodes=$(sudo -E kubectl get node -o name | cut -d '/' -f 2)
