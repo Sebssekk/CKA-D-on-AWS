@@ -61,7 +61,7 @@ Before creating the infrastructure, the project must be bootstrapped to prepare 
 4. **_cdk_** deploy.  
    To actually create the _CloudFormation_ Stack with the desired resources:
    ```bash
-   $ cdk deploy --all
+   $ cdk deploy --all --concurrency 4
    ```
    ⚠️**NOTE**⚠️  
    *This command will start creating resources and using your billing/credits.*
@@ -86,9 +86,9 @@ All nodes can be accessed with the same ssh key generated on startup.
     - user: 
         - **ec2-user** if accessing with ssh
         - **user\<X\>** if accessing from code-server UI (where **X** goes from 1 to the number of `USERS`)
-    - OS: Amazon Linux
+    - OS: Amazon Linux 2023
     - Instance Type: m8g.xlarge4
-    - Storage size: 8G
+    - Storage size: 20G
     - Relevant installed tools:
         - `AWS System Manager`
         - `docker`
@@ -97,6 +97,7 @@ All nodes can be accessed with the same ssh key generated on startup.
         - `helm`
         - `git`
         - `code-server`
+        - `ansible`
 
 ## **Usage Walkthrough**
 Follow the [detailed walkthrough](./docs/walkthrough.md)
@@ -132,6 +133,6 @@ PS> .\utils\cleanup.ps1
 
 Finally, to destroy all created resources, run the command:
 ```bash
-cdk destroy 
+cdk destroy --all
 ```
 And wait for confirmation

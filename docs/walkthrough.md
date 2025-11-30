@@ -13,16 +13,6 @@ This walkthrough will guide you on how to access and configure clusters.
    PS> .\utils\get-access-ip.ps1
    ```
 
-- <u>Users/VMs mapping</u>  
-  Running the script [`generate-user-instances-csv`](../utils/generate-user-instances-csv.sh) generates a CSV file containing an association between users and their assigned K8s VMs (control planes and workers). It also uploads the file to the *Access* node in the `/public` folder:
-   ```bash
-   $ ./utils/generate-user-instances-csv.sh
-   ```
-   OR with PowerShell:
-   ```powershell
-   PS> .\utils\generate-user-instances-csv.ps1
-   ```
-
 - <u>VMs details</u>  
   The script [`generate-k8s-instances-csv`](../utils/generate-k8s-instances-csv.sh) generates a CSV file containing details of K8s VMs (useful for tagging K8s nodes later). It also uploads the file to the *Access* node in the `/public` folder:
    ```bash
@@ -48,11 +38,14 @@ This walkthrough will guide you on how to access and configure clusters.
    ```
 
 ## 1 - Access the Bastion Host (Access Node)
-From the *Access* node public IP, you can log in to the exposed code-server via `http://<PUBLIC_IP>:8080 + <USER_NUM>`.  
+From the *Access* node public IP, you can log in to the exposed code-server via `https://<PUBLIC_IP>:8080 + <USER_NUM>`.  
 **Example**
-- user1 --> `http://<PUBLIC_IP>:8081`
-- user2 --> `http://<PUBLIC_IP>:8082`
+- user1 --> `https://<PUBLIC_IP>:8081`
+- user2 --> `https://<PUBLIC_IP>:8082`
 - ... 
+
+**Note.** The certicate is self-signed so it will give you a security warning when opening the page.  
+Safely proceed
 
 ![code-server login](./imgs/cs-login.png)
 
@@ -61,12 +54,17 @@ The password to log in is defined by the `ACCESS_PSW` variable (**lab123** by de
 ![code-server home](./imgs/cs-home.png)
 
 **NOTE.** The **[Kubernetes Extension](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-kubernetes-tools)** has already been installed to simplify coding.  
-**NOTE 2.** The `/public` folder of the *Access* node can be read/written by any user. This is useful for sharing files in the code-server.
+**NOTE 2.** The `/public` folder of the *Access* node can be read/written by any user.  
+This is useful for sharing files in the code-server.
 
 ## 2 - Create the Kubernetes Cluster
 Every user must create their own cluster from their code-server access.
+- **Clusters Details**
+    In the `/public` folder on the *Access VM* there are 2 files
+    - `user-instances.csv` -> a CSV file containing an association between **users** and their assigned **K8s VMs** (control planes and workers)
+    - `k8s-instances.csv` -> a CSV file containing details of K8s VMs (useful for tagging K8s nodes later)
 - **CP Login**  
-    Referring to the previously generated `user-instances.csv` file, each user should connect to their *Control Plane* machine from the *Access* node.  
+    Referring to the `user-instances.csv` file, each user should connect to their *Control Plane* machine from the *Access* node.  
     The SSH key has been pre-generated and can be found in every user's home folder as `k8s-key`:
     ```bash
     ssh -i $HOME/k8s-key ubuntu@<CP_IP>
@@ -94,13 +92,13 @@ Every user must create their own cluster from their code-server access.
     If you want to use **cilium** as the CNI, install it on the newly created cluster with:
     ```bash
     # FROM THE CONTROL PLANE MACHINE #
-    CILIUM_VERSION=1.18.3
+    CILIUM_VERSION=1.18.3 # Check for most recent version
     cilium install --version $CILIUM_VERSION \
                    --set ipam.mode=kubernetes
     ```
 
 - **Worker Login & Join**  
-    Referring to the previously generated `user-instances.csv` file, each user should connect to their *Worker(s)* machine from the *Access* node.  
+    Referring to the `user-instances.csv` file, each user should connect to their *Worker(s)* machine from the *Access* node.  
     The SSH key is again `k8s-key`:
     ```bash
     ssh -i $HOME/k8s-key ubuntu@<W_IP>
@@ -131,6 +129,19 @@ Every user must create their own cluster from their code-server access.
     ```
     **NOTE.** Alias `k` for `kubectl` and bash autocompletion have already been installed for all access users
 
+
+## (Optional) Ansible
+The *Access* node has pre-installed and pre-configured **ansible**.  
+- With `ansible cps` is possible to communicate with all control planes.  
+- With `ansible workers` is possible to communicate with all control planes. 
+Try with  
+```bash
+ansible all -m ping
+ansible cps -m ping
+ansible workers -m ping
+```
+
+# **Cluster Addons**
 ## **Metric Server**
 The **[Metric Server](https://github.com/kubernetes-sigs/metrics-server)** can be added with `Helm` from the *Access* node with
 ```bash
@@ -146,14 +157,11 @@ As the environment lives on AWS, it's possible to implement the **[AWS Load Bala
 
 - **Node Labels**  
     For AWS plugin to work nodes must have some metadata configured.  
-    This information are listed in the previously generated `k8s-instances.csv` file.  
-    Once all clusters are ready it's possible to patch all nodes from here using the script [`apply-node-patch`](../utils/apply-node-patch.sh)
+    This information are listed in the `k8s-instances.csv` file.  
+    Once all clusters are ready it's possible to patch all nodes using the script [`/public/aws-node-patch.sh`](../access-helpers/aws-node-patch.sh)
     ```bash
-    $ ./utils/apply-node-patch.sh
-    ```
-    OR with PS
-    ```powershell
-    PS> .\utils\apply-node-patch.ps1
+    # FROM ACCESS VM
+    $ /public/aws-node-patch.sh
     ```
 
     This will add region, zone and machine type to k8s node as labels and will configure the EC2 machine id as `Provider` of the node.
