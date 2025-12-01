@@ -10,7 +10,9 @@ export class K8sStack extends Stack {
         
         const initData = CloudFormationInit.fromConfigSets({
             configSets: {
-                k8sPrep: ['aws','osPrep', 'cilium', 'etcd','kernelPrep','kubeStart']
+                k8sPrep: ['aws','osPrep', 'cilium', 'etcd','kernelPrep','kubeStart'],
+                k8sCP: ['masterInit'],
+                k8sW: ['workerInit']
             },
             configs:{
                 aws: new InitConfig([
@@ -19,27 +21,29 @@ export class K8sStack extends Stack {
                         sudo snap start amazon-ssm-agent
                         sudo wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb 
                         sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
-                        sudo rm ./amazon-cloudwatch-agent.deb`)
+                        sudo rm ./amazon-cloudwatch-agent.deb
+                        sudo snap install aws-cli --classic
+                        `)
                 ]),
                 osPrep: new InitConfig([
                     InitCommand.shellCommand(`
-                        sudo apt -y update && sudo apt -y upgrade
+                        sudo apt-get -y update && sudo apt-get -y upgrade
                         sudo systemctl stop unattended-upgrades
                         sudo apt-get -y purge unattended-upgrades
                         
                         sudo swapoff -a && sed -i '/ swap / s/^\\(.*\\)$/#\\1/g' /etc/fstab
 
-                        sudo apt install -y curl nfs-utils gnupg2 software-properties-common apt-transport-https ca-certificates python3-pip jq
+                        sudo apt-get install -y curl nfs-utils gnupg2 software-properties-common apt-transport-https ca-certificates python3-pip jq
 
-                        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg && sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && sudo apt update
-                        sudo apt install -y containerd.io
+                        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/docker.gpg && sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && sudo apt-get update
+                        sudo apt-get install -y containerd.io
                         containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
                         # sudo sed -i 's/SystemdCgroup \\= false/SystemdCgroup \\= true/g' /etc/containerd/config.toml
                         sudo systemctl enable containerd
 
                         sudo curl -fsSL https://pkgs.k8s.io/core:/stable:/v$K8S_VERSION/deb/Release.key |  sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
                         echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v$K8S_VERSION/deb/ /" | sudo  tee /etc/apt/sources.list.d/kubernetes.list
-                        sudo apt update && sudo apt install -y kubelet kubeadm kubectl && sudo apt-mark hold kubelet kubeadm kubectl
+                        sudo apt-get update && sudo apt-get install -y kubelet kubeadm kubectl && sudo apt-mark hold kubelet kubeadm kubectl
                         # sudo sed -i s"/KUBELET_EXTRA_ARGS=/KUBELET_EXTRA_ARGS=\"--fail-swap-on=false\"/" /etc/default/kubelet
                         sudo systemctl enable kubelet
                         `,{
@@ -95,16 +99,58 @@ EOF
                         sudo systemctl start kubelet
                         sleep 10
                         sudo systemctl restart containerd`)
+                ]),
+                masterInit: new InitConfig([
+                    InitCommand.shellCommand(`
+                        sudo kubeadm init --pod-network-cidr 172.16.0.0/16
+                        sudo mkdir -p /home/ubuntu/.kube/
+                        sudo cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+                        sudo chown -R ubuntu:ubuntu /home/ubuntu/.kube
+                        sudo su ubuntu -c "cilium install --version $CILIUM_VERSION --set ipam.mode=kubernetes"
+                        sudo kubeadm token create --print-join-command | sudo tee /tmp/join.me
+                        sudo chown ubuntu:ubuntu /tmp/join.me
+                        `, {env: {
+                            CILIUM_VERSION: props.CILIUM_VERSION
+                        }}),
+                    ]),
+                workerInit: new InitConfig([
+                    InitCommand.shellCommand(`
+                        TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+                        USER=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/USER)
+                        X=$(echo "$USER" | cut -c 5-)
+                        aws ec2 wait instance-running --region ${props.REGION} --filters "Name=tag:Name,Values=k8s-cp$X"
+                        CP_IP=$(aws ec2 describe-instances \
+                            --region ${props.REGION} \
+                            --filters "Name=tag:Name,Values=k8s-cp$X" "Name=instance-state-name,Values=running" \
+                            --query 'Reservations[].Instances[].PrivateIpAddress' \
+                            --output text )
+                        sudo aws ssm get-parameter --region ${props.REGION} --name '/ec2/keypair/${props.keyPair.keyPairId}' --with-decryption --query 'Parameter.Value' --output text | sudo tee /tmp/key 
+                        sudo chmod 600 /tmp/key
+                        
+                        ATTEMPT_COUNT=1
+                        while true; do
+                            if [ $ATTEMPT_COUNT -ge 12 ]; then
+                                echo "Maximum attempts reached. Target file not found. Exiting."
+                                 exit 1
+                            fi
+                            sudo ssh -o "StrictHostKeyChecking no" -i /tmp/key ubuntu@$\{CP_IP\} "test -f /tmp/join.me"
+        
+                            if [ $? -eq 0 ]; then
+                                break 
+                            fi
+    
+                            ATTEMPT_COUNT=$((ATTEMPT_COUNT + 1))
+                                sleep 10
+                        done
+                        sudo scp -o "StrictHostKeyChecking no" -i /tmp/key ubuntu@$\{CP_IP\}:/tmp/join.me /tmp/join.me
+                        sudo chmod +x /tmp/join.me
+                        sudo /tmp/join.me
+                        `)            
                 ])
             }
         })
 
-        const userData = UserData.forLinux()
-        userData.addCommands(`apt-get update 
-            apt-get install -y python3-pip
-            mkdir -p /opt/aws/bin
-            pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz --break-system-packages
-            ln -s /usr/local/bin/cfn-* /opt/aws/bin/`)
+        
         
         const role = new Role(this, "CKAInstanceRole", {
             roleName: "CKA-K8s-Node-role",
@@ -367,12 +413,56 @@ EOF
                             "Resource": "*"
                         }
                     ]
-                }),    
+                }),
+                "K8sGetSSHKey": PolicyDocument.fromJson({
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                      "Effect": "Allow",
+                      "Action": [
+                          "ssm:GetParameter"
+                      ],
+                      "Resource": [
+                          `arn:aws:ssm:*:*:parameter/ec2/keypair/${props.keyPair.keyPairId}`
+                      ]
+                    },{
+                      "Effect": "Allow", 
+                      "Action": [
+                        "kms:Decrypt"
+                      ],
+                      "Resource": "arn:aws:kms:*:*:key/alias/aws/ssm"
+                    }]
+                }) ,
+                "K8sDescribeInstances": PolicyDocument.fromJson({
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                      "Effect": "Allow",
+                      "Action": [
+                          "ec2:DescribeInstances",
+                          "ec2:DescribeTags"
+                      ],
+                      "Resource": "*"
+                    }]
+                })   
             }
         })
+        
+        const userDataString = `sudo apt-get update
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 ; do
+    echo "Waiting for other apt-get instances to exit"
+    sleep 2
+done
+sudo apt-get install -y python3-pip
+mkdir -p /opt/aws/bin
+pip install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz --break-system-packages
+ln -s /usr/local/bin/cfn-* /opt/aws/bin/
+`
 
         for (let x = 1; x <= props.CLUSTERS_NUM; x++) {
-            let cpVm = new Instance(this, `K8sCP${x}`, {
+            
+            let cpUserData = UserData.forLinux()
+            cpUserData.addCommands(userDataString)
+            
+            let cpVm = new Instance(this, `K8sCP${x}`, {  
                 vpc: props.vpc,
                 instanceName: `k8s-cp${x}`,
                 role: role,
@@ -389,18 +479,22 @@ EOF
                     volume: BlockDeviceVolume.ebs(20)
                   }
                 ],
-                userData: userData,
+                userData: cpUserData,
                 init: initData,
                 initOptions: {
                     timeout: Duration.minutes(15),
-                    configSets: ['k8sPrep'],
+                    configSets: ['k8sPrep', ...props.CLUSTERS_READY ? ['k8sCP'] : []],
                     ignoreFailures: true
                 }
             })
-            cpVm.instance.metadataOptions = { ...cpVm.instance.metadataOptions, httpPutResponseHopLimit: 3,}
+            cpVm.instance.metadataOptions = { ...cpVm.instance.metadataOptions, httpPutResponseHopLimit: 3,instanceMetadataTags: "enabled"}
             Tags.of(cpVm).add("USER", `user${x}`)
 
             for (let y = 1; y <= props.WORKERS_NUM; y++) {
+              
+              let wUserData = UserData.forLinux()
+              wUserData.addCommands(userDataString)
+              
               let wVm = new Instance(this, `K8sW${x}${y}`, {
                 vpc: props.vpc,
                 instanceName: `k8s-w${x}-${y}`,
@@ -418,15 +512,15 @@ EOF
                     volume: BlockDeviceVolume.ebs(20)
                   }
                 ],
-                userData: userData,
+                userData: wUserData,
                 init: initData,
                 initOptions: {
                     timeout: Duration.minutes(15),
-                    configSets: ['k8sPrep'],
+                    configSets: ['k8sPrep', ...props.CLUSTERS_READY ? ['k8sW']: []],
                     ignoreFailures: true
                 }
               })
-              wVm.instance.metadataOptions = { ...cpVm.instance.metadataOptions, httpPutResponseHopLimit: 3,}
+              wVm.instance.metadataOptions = { ...cpVm.instance.metadataOptions, httpPutResponseHopLimit: 3,instanceMetadataTags: "enabled"}
               Tags.of(wVm).add("USER", `user${x}`)
             }
         }

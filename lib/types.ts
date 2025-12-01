@@ -10,16 +10,21 @@ export interface AccessStackProps extends StackProps {
     keyPair: KeyPair,
     sg: SecurityGroup,
     vpc: Vpc,
+    CLUSTERS_READY: boolean
+
 }
 
 export interface K8sStackProps extends StackProps {
     K8S_VERSION: string,
     ETCD_VERSION: string , 
+    CILIUM_VERSION: string,
     CLUSTERS_NUM: number,
     WORKERS_NUM: number,
+    REGION: string,
     vpc: Vpc,
     keyPair: KeyPair,
     sg: SecurityGroup,
+    CLUSTERS_READY: boolean
 }
 
 export interface NetworkStackProps extends StackProps {

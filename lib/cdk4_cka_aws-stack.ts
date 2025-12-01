@@ -16,7 +16,10 @@ export class Cdk4CkaAwsStack extends Stack {
     const REGION: string = this.region
     const K8S_VERSION : string = process.env.K8S_VERSION || "1.33"
     const ETCD_VERSION : string = process.env.ETCD_VERSION || "v3.6.6"
+    const CILIUM_VERSION : string = process.env.CILIUM_VERSION || "1.18.3"
     const ACCESS_PSW : string = process.env.ACCESS_PSW || "lab123"
+    const CLUSTERS_READY: boolean = process.env.CLUSTERS_READY === "yes"
+    
 
     const netStack = new NetworkStack(this, "CKANetworkStack", {
       ACCESS_NUM: ACCESS_NUM
@@ -30,7 +33,8 @@ export class Cdk4CkaAwsStack extends Stack {
           REGION: REGION,
           ACCESS_NUM: ACCESS_NUM,
           ACCESS_PSW: ACCESS_PSW,
-          CLUSTERS_NUM: CLUSTERS_NUM
+          CLUSTERS_NUM: CLUSTERS_NUM,
+          CLUSTERS_READY: CLUSTERS_READY
         })
     }
 
@@ -38,10 +42,13 @@ export class Cdk4CkaAwsStack extends Stack {
       vpc: netStack.vpc,
       keyPair: netStack.keyPair,
       sg: netStack.sg,
+      REGION: REGION,
       K8S_VERSION: K8S_VERSION,
       ETCD_VERSION: ETCD_VERSION,
+      CILIUM_VERSION: CILIUM_VERSION,
       CLUSTERS_NUM: CLUSTERS_NUM,
-      WORKERS_NUM: WORKERS_NUM
+      WORKERS_NUM: WORKERS_NUM,
+      CLUSTERS_READY: CLUSTERS_READY
     })
   }
 }

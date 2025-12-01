@@ -10,7 +10,8 @@ export class AccessStack extends Stack {
         
         const initData = CloudFormationInit.fromConfigSets({
             configSets: {
-                access: ['codeServerService','aws','docker','kubernetes','tools','userInit','getClustersDetails']
+                access: ['codeServerService','aws','docker','kubernetes','tools','userInit','getClustersDetails'],
+                clustersReady: ['kubeconfig']
             },
             configs:{
                 codeServerService: new InitConfig([
@@ -84,12 +85,14 @@ export class AccessStack extends Stack {
                 ]),
                 userInit: new InitConfig([
                     InitCommand.shellCommand(`
+                        aws ssm get-parameter --region ${props.REGION} --name '/ec2/keypair/${props.keyPair.keyPairId}' --with-decryption --query 'Parameter.Value' --output text | sudo tee /public/k8s-key
                         for x in $(seq 1 ${props.ACCESS_NUM}); do 
                             useradd user$x --create-home -s /bin/bash 
                             echo ${props.ACCESS_PSW} | sudo passwd user$x --stdin
                             sudo usermod -a -G docker user$x
                             sudo su user$x -c "echo -e 'source <(kubectl completion bash) \\nalias k=kubectl \\ncomplete -o default -F __start_kubectl k' >> /home/user$x/.bashrc"
-                            sudo su user$x -c "aws ssm get-parameter --region ${props.REGION} --name '/ec2/keypair/${props.keyPair.keyPairId}' --with-decryption --query 'Parameter.Value' --output text > /home/user$x/k8s-key && chmod 600 /home/user$x/k8s-key"
+                            sudo cp /public/k8s-key /home/user$x/k8s-key && sudo chmod 600 /home/user$x/k8s-key
+                            sudo chown user$x:user$x /home/user$x/k8s-key
                             sudo systemctl enable --now code-server@$x.service
                             sudo su user$x -c "code-server --install-extension ms-kubernetes-tools.vscode-kubernetes-tools"
                         done`)
@@ -115,7 +118,19 @@ export class AccessStack extends Stack {
                             group: 'root',
                             mode: "0777"
                         }
-                    )
+                    ),
+                ]),
+                kubeconfig: new InitConfig([
+                    InitCommand.shellCommand(`
+                        for x in $(seq 1 ${props.ACCESS_NUM}); do 
+                            CP_IP=$(aws ec2 describe-instances \
+                                --region ${props.REGION} \
+                                --filters "Name=tag:Name,Values=k8s-cp$x" "Name=instance-state-name,Values=running" \
+                                --query 'Reservations[].Instances[].PrivateIpAddress' \
+                                --output text )
+                            sudo su user$x -c "mkdir -p /home/user$x/.kube"
+                            sudo su user$x -c "scp -o 'StrictHostKeyChecking no' -i /home/user$x/k8s-key ubuntu@$\{CP_IP\}:/home/ubuntu/.kube/config /home/user$x/.kube/config"
+                        done`)
                 ])
             }
         })
@@ -189,7 +204,7 @@ export class AccessStack extends Stack {
             ],
           init: initData,
           initOptions: {
-            configSets: ['access'],
+            configSets: ['access' , ...props.CLUSTERS_READY ? ['clustersReady'] : []],
             timeout: Duration.minutes(15),
             ignoreFailures: true
           }

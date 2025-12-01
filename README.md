@@ -34,6 +34,7 @@ Before creating the infrastructure, the project must be bootstrapped to prepare 
 - *WORKERS_NUM* - Number of worker nodes per cluster. 1 by default
 - *K8S_VERSION* - The Kubernetes version. 1.33 by default
 - *ACCESS_PSW* - The password access users will use to connect to code-server
+- *CLUSTERS_READY* - If set to `yes` will automatically install Kubernetes and create clusters (Good for a **CKAD** course) 
 
 2. Dependencies preparation.  
    From the root directory of the project, run the command:

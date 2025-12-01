@@ -1,1 +1,1 @@
-- [ ] Add a the possibility to create ready to use clusters (for CKAD)
+- [ ] Have the possibility to auto install also addons - Metric Server,LoadBalancer, Ingress, Gateway API, Storage Class - (always regulated by envs) for a ready to use complete CKAD course

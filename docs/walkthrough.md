@@ -58,6 +58,8 @@ The password to log in is defined by the `ACCESS_PSW` variable (**lab123** by de
 This is useful for sharing files in the code-server.
 
 ## 2 - Create the Kubernetes Cluster
+***Note.** If The variable `CLUSTERS_READY` has been set yo `yes` than clusters are already configured. You can skip this part.*  
+
 Every user must create their own cluster from their code-server access.
 - **Clusters Details**
     In the `/public` folder on the *Access VM* there are 2 files

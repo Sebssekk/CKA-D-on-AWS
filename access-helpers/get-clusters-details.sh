@@ -36,10 +36,18 @@ for x in $(seq 1 $CLUSTERS_NUM); do
     workers=$(aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" "Name=tag:USER,Values=$user" "Name=tag:Name,Values=k8s-w$x-*" --query "Reservations[].Instances[].PrivateIpAddress" --output text | tr '\t' ' ')
     echo "$user,$cp,$workers" >> /public/user-instances.csv
 
-    CPs="${CPs}m$x  ansible_host=${cp}\\n"
+    CPs="${CPs}m$x  ansible_host=${cp}\n"
+
+    cat | sudo tee /home/$user/.ansible.cfg << EOF
+[defaults]
+host_key_checking = False
+inventory = /etc/ansible/inventory.ini
+private_key_file = /home/$user/k8s-key
+EOF
+    sudo chown $user:$user /home/$user/.ansible.cfg
     worker_num=1
     for worker in $workers; do
-        WKs="${WKs}w$x-$worker_num  ansible_host=$worker\\n"
+        WKs="${WKs}w$x-$worker_num  ansible_host=$worker\n"
         worker_num=$((worker_num+1))
     done
 done
@@ -48,21 +56,7 @@ pip install ansible # --break-system-packages
 
 sudo mkdir -p /etc/ansible
 
-cat | sudo tee /etc/ansible/ansible.cfg << EOF
-[defaults]
-host_key_checking = False
-inventory = /etc/ansible/inventory.ini
-EOF
-
-cat | sudo tee /etc/ansible/inventory.ini << EOF
-[cps]
-$CPs
-[workers]
-$WKs
-[all:vars]
-ansible_user=ubuntu
-ansible_ssh_private_key_file=/public/k8s-key
-EOF
+echo -e "[cps]\n$CPs\n[workers]\n$WKs\n[all:vars]\nansible_user=ubuntu\n" | sudo tee /etc/ansible/inventory.ini 
 
 sudo chmod +r /etc/ansible/*
 
