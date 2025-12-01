@@ -34,7 +34,7 @@ Before creating the infrastructure, the project must be bootstrapped to prepare 
 - *WORKERS_NUM* - Number of worker nodes per cluster. 1 by default
 - *K8S_VERSION* - The Kubernetes version. 1.33 by default
 - *ACCESS_PSW* - The password access users will use to connect to code-server
-- *CLUSTERS_READY* - If set to `yes` will automatically install Kubernetes and create clusters (Good for a **CKAD** course) 
+- *CLUSTERS_READY* - If set to `yes` will automatically install Kubernetes and create all clusters (Good for a **CKAD** course where admnistration tasks are not the focus) 
 
 2. Dependencies preparation.  
    From the root directory of the project, run the command:
@@ -98,7 +98,7 @@ All nodes can be accessed with the same ssh key generated on startup.
         - `helm`
         - `git`
         - `code-server`
-        - `ansible`
+        - `ansible` (preconfigured)
 
 ## **Usage Walkthrough**
 Follow the [detailed walkthrough](./docs/walkthrough.md)
@@ -106,7 +106,7 @@ Follow the [detailed walkthrough](./docs/walkthrough.md)
 ## **Night Stop**
 To save money, it's possible to stop all nodes with the [stop-instances](./utils/stop-instances.sh) script:
 ```bash
-$ ./utils/stop-instances.sh
+$ bash ./utils/stop-instances.sh
 ```
 OR with PS
 ```powershell
@@ -115,13 +115,21 @@ PS> .\utils\stop-instances.ps1
 
 When you need them back, you can restart them with the [start-instances](./utils/start-instances.sh) script:
 ```bash
-$ ./utils/start-instances.sh
+$ bash ./utils/start-instances.sh
 ```
 OR with PS
 ```powershell
 PS> .\utils\start-instances.ps1
 ```
-
+**Note** that the public ip of the *Access* Node is ephimaeral. It will change on every reboot.  
+To get new IP you can use [get-access-ip](./utils/get-access-ip.sh) script:
+```bash
+$ bash ./utils/get-access-ip.sh
+```
+OR with PS
+```powershell
+PS> .\utils\get-access-ip.ps1
+```
 ## **Clean up**
 You can destroy AWS LoadBalancers and EBS volumes created by K8s with the [`cleanup`](./utils/cleanup.sh) script:
 ```bash

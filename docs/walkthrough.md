@@ -6,27 +6,17 @@ This walkthrough will guide you on how to access and configure clusters.
    Once the CDK deployment is completed, the *Access* node public IP is printed.  
    This can also be gathered with the [`get-access-ip`](../utils/get-access-ip.sh) script:
    ```bash
-   $ ./utils/get-access-ip.sh
+   $ bash ./utils/get-access-ip.sh
    ```
    OR with PowerShell:
    ```powershell
    PS> .\utils\get-access-ip.ps1
    ```
 
-- <u>VMs details</u>  
-  The script [`generate-k8s-instances-csv`](../utils/generate-k8s-instances-csv.sh) generates a CSV file containing details of K8s VMs (useful for tagging K8s nodes later). It also uploads the file to the *Access* node in the `/public` folder:
-   ```bash
-   $ ./utils/generate-k8s-instances-csv.sh
-   ```
-   OR with PowerShell:
-   ```powershell
-   PS> .\utils\generate-k8s-instances-csv.ps1
-   ```
-
 - <u>VMs SSH</u>  
   All VMs (both *Access* and K8s nodes) share the same SSH key. This can be retrieved with the [`get-ssh-key`](../utils/get-ssh-key.sh) script:
    ```bash
-   $ ./utils/get-ssh-key.sh
+   $ bash ./utils/get-ssh-key.sh
    ```
    OR with PowerShell:
    ```powershell
